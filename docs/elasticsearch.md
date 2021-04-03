@@ -108,9 +108,9 @@ soft nproc ：单个用户可用的最大进程数量(超过会警告);
 
 ## 5.安装es管理工具Kibana
 
-docker pull kibana:6.8.4
+`docker pull kibana:6.8.4`
 
-docker run -it -d -e ELASTICSEARCH_URL=http://192.168.91.20:9200 --name kibana --link elasticsearch:elasticsearch -p 5601:5601 kibana:6.8.4
+`docker run -it -d -e ELASTICSEARCH_URL=http://192.168.91.20:9200 --name kibana --link elasticsearch:elasticsearch -p 5601:5601 kibana:6.8.4`
 
 注：
 
@@ -118,16 +118,95 @@ docker run -it -d -e ELASTICSEARCH_URL=http://192.168.91.20:9200 --name kibana -
 
 ## 6.常用es管理操作
 
-### 6.1.查看健康状态    
+### 6.1.查看信息
+
+#### 6.1.1.查看集群健康状态    
 
 ?v表示带有标题头
 
-GET /_cat/health?v
+`GET /_cat/health?v`
 
-### 6.2.创建索引
+#### 6.1.2.查看索引信息
+
+`GET /_cat/indices?v`
+
+#### 6.1.3.查看集群中节点信息
+
+`GET /_cat/nodes?v`
+
+#### 6.1.4.查看分片信息
+
+`GET /_cat/shards?v`
+
+### 6.2.索引操作
+
+#### 6.2.1.创建
 
 命令语法：PUT 索引名[索引配置参数]
 
 index名称**<u>必须小写</u>**，且不能以下划线'_',	'-',	'+'开头，不能包含字符	,	\	*	\\\	<	>	|	/	?	""
 
-每个索引默认5个主分片，5个从分片
+每个索引默认5个主分片，5个从分片（索引的主分片数5，每个主分片的副本数1）
+
+`PUT my_index`
+
+#### 6.2.2.创建索引并指定分片
+
+注意：编写时大括号不能和put命令在一行（不能把{放在索引名后，kibana会把{当成索引的一部分）
+
+`PUT second_index`
+`{`
+  `"settings": {`
+    `"number_of_shards": 2,`
+    `"number_of_replicas": 0`
+  `}`
+`}`
+
+注：磁盘空间不足15%时从分片不再分配，不足5%时主分片不在分配
+
+#### 6.2.3.修改索引
+
+命令：PUT 索引名/_setting{索引配置参数}
+
+注意：索引一旦创建，primary shards数量不可变化，可以改变replica shards的数量
+
+`PUT my_index/_settings`
+`{`
+  `"number_of_replicas": 0`
+`}`
+
+#### 6.2.4.删除索引
+
+命令：DELETE 索引名
+
+支持删除多个，DELETE index1,index2,index3...
+
+`DELETE my_index,second_index`
+
+### 6.3.文档操作
+
+es中向一个不存在的索引中添加数据自动创建索引，索引的主分片数5，每个主分片的副本数1
+
+`PUT my_index/my_type/1`
+`{`
+  `"name":"zhangjianhua",`
+  `"age":27,`
+  `"gender":"man",`
+  `"info": {`
+    `"card_id":"342923199410253110"`
+  `},`
+  `"hobbies":["eat","java","sleep","game","study"]`
+`}`
+
+`POST my_index/my_type`
+`{`
+  `"name":"zhangsan",`
+  `"age":25,`
+  `"gender":"man",`
+  `"info": {`
+    `"card_id":"342923199410253110"`
+  `},`
+  `"hobbies":["eat","java","sleep","game","study"]`
+`}`
+
+注：POST和PUT的区别是POST能够保证在分布式环境下id是唯一的，而PUT使用的是uuid
