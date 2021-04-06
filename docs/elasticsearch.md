@@ -183,7 +183,9 @@ index名称**<u>必须小写</u>**，且不能以下划线'_',	'-',	'+'开头，
 
 `DELETE my_index,second_index`
 
-### 6.3.文档操作
+### 6.3.Document操作
+
+#### 6.3.1.添加文档
 
 es中向一个不存在的索引中添加数据自动创建索引，索引的主分片数5，每个主分片的副本数1
 
@@ -210,3 +212,197 @@ es中向一个不存在的索引中添加数据自动创建索引，索引的主
 `}`
 
 注：POST和PUT的区别是POST能够保证在分布式环境下id是唯一的，而PUT使用的是uuid
+
+#### 6.3.2.索引查询
+
+##### 1.主键查询：索引名称/索引类型/id
+
+`GET my_index/my_type/2`
+
+##### 2.多值查询
+
+`GET my_index/my_type/_mget
+{
+  "docs": [
+      {
+        "_id":"1"`
+      `},`
+      `{`
+        `"_id":"2"
+      },
+      {
+        "_id":"3"`
+      `}`
+    `]`
+`}`
+
+##### 3.查询全部
+
+GET 索引名/索引类型/_search
+
+#### 6.3.3.修改
+
+##### 1.全量替换
+
+命令:	POST/PUT 索引名/索引类型/唯一ID
+
+​			json数据
+
+`POST my_index/my_type/2`
+`{`
+  `"name":"zhangsan",`
+  `"age":25,`
+  `"gender":"man",`
+  `"info": {`
+    `"card_id":"342923199410253110"`
+  `},`
+  `"hobbies":["eat","java","sleep","game","study"]`
+`}`
+
+本操作相当于覆盖操作。全量替换过程中，elasticsearch不会真的修改Document中的数据，而是标记elasticsearch中原有的document为deleted状态，再创建一个新的document来存储数据，当elasticsearch中的数据量过大时，elasticsearch后台回收deleted状态的document。
+
+##### 2.部分更新
+
+命令：POST 索引名称/索引类型/唯一ID/_update
+
+​			json数据
+
+`POST my_index/my_type/2/_update`
+`{`
+  `"doc":{`
+    `"name":"lisi"`
+  `}`
+`}`
+
+#### 6.3.4.删除
+
+DELETE 索引名称/索引类型/唯一ID
+
+`DELETE my_index/my_type/2`
+
+#### 6.3.5.批量增删改（*常用）
+
+使用bulk语法执行批量增删改，语法格式如下：
+
+注意：_bulk的两个{}json串都不要出现换行等操作，两个{}使用回车符进行识别。
+
+`POST _bulk
+{"create":{"_index":"my_index","_type":"my_type","_id":"3"}}`
+`{"name":"test_create__3"}
+{"create":{"_index":"my_index","_type":"my_type","_id":"3"}}
+{"name":"test_create__3_1"}`
+`{"index":{"_index":"my_index","_type":"my_type","_id":"4"}}
+{"name":"test_create__4"}
+{"index":{"_index":"my_index","_type":"my_type","_id":"2"}}`
+`{"gender":"women"}`
+`{"delete":{"_index":"my_index","_type":"my_type","_id":"9"}}
+{"update":{"_index":"my_index","_type":"my_type","_id":"8"}}`
+`{"doc":{"married":false}}`
+
+备：create强制新增，若id存在的则执行失败，不存在新增一条
+
+​		index若id不存在，新增一条，若存在则覆盖
+
+​		delete删除
+
+​		update修改
+
+以上相同索引、类型可以合并简写：
+
+`POST my_index/my_type/_bulk
+{"create":{"_id":"3"}}`
+`{"name":"test_create__3"}
+{"create":{"_id":"3"}}
+{"name":"test_create__3_1"}`
+`{"index":{"_id":"4"}}
+{"name":"test_create__4"}
+{"index":{"_id":"2"}}`
+`{"gender":"women"}`
+`{"delete":{"_id":"9"}}
+{"update":{"_id":"8"}}`
+`{"doc":{"married":false}}`
+
+## 7.分词器（analyzer）和标准化处理（normalization）
+
+### 7.1.es默认提供常见分词器
+
+standard analyzer 是es中的默认分词器。标准分词器，处理英语语法的分词器。切分过程中不会忽略停止词（如：the、a、an等）。会进行单词的大小转换、过滤连接符（-）或括号等常见符号。
+
+要切分的句子：Set the shape semi-transparent by calling set_trans(5)
+
+切分后的句子：set, the, shape, to, semi, tranparent, by, calling, set_trans, 5
+
+**standard analyzer** 
+
+`GET _analyze`
+`{`
+  `"text":"Set the shape semi-transparent by calling set_trans(5)",`
+  `"analyzer": "standard"`
+`}`
+
+**simple analyzer** 
+
+`GET _analyze`
+`{`
+  `"text":"Set the shape semi-transparent by calling set_trans(5)",`
+  `"analyzer": "simple"`
+`}`
+
+**whitespace analyzer** 
+
+`GET _analyze`
+`{`
+  `"text":"Set the shape semi-transparent by calling set_trans(5)",`
+  `"analyzer": "whitespace"`
+`}`
+
+**language analyzer**
+
+`GET _analyze`
+`{`
+  `"text":"我们在一起",`
+  `"analyzer": "chinese"`
+`}`
+
+### 7.2.安装中文分词器
+
+IK分词器提供了两种analyzer，分别是ik_max_word和ik_smart。
+
+ik_max_word：会将文本做最细粒度的拆分，会穷尽各种可能组合。
+
+ik_smart：会做最粗粒度的拆分。
+
+**1.进入容器**
+
+`docker exec -it elasticsearch /bin/bash`
+
+**2.运行bin目录下的`elasticsearch-plugin`**
+
+`./bin/elasticsearch-plugin install https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v6.8.4/elasticsearch-analysis-ik-6.8.4.zip`
+
+**或者：**
+
+先下载https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v6.8.4/elasticsearch-analysis-ik-6.8.4.zip压缩包，上传到服务器，然后复制压缩包到容器：docker cp path/elasticsearch-analysis-ik-6.8.4.zip 容器名称:/usr/share/elasticsearch/plugins,然后容器内创建目录make dir，容器内移动压缩包到目录mv elasticsearch-analysis-ik-6.8.4.zip ik/，容器内解压缩unzip elasticsearch-analysis-ik-6.8.4.zip，删除zip文件。
+
+**3.重启容器**
+
+`docker restart elasticsearch`
+
+**4.ik_max_word analyzer**
+
+`GET _analyze`
+`{`
+  `"text":"今天心情不错哦",`
+  `"analyzer": "ik_max_word"`
+`}`
+
+**5.ik_smart**
+
+`GET _analyze`
+`{`
+  `"text":"今天心情不错哦",`
+  `"analyzer": "ik_smart"`
+`}`
+
+## 8.es中的mapping问题
+
