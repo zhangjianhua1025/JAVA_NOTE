@@ -406,3 +406,143 @@ ik_smart：会做最粗粒度的拆分。
 
 ## 8.es中的mapping问题
 
+Mapping在elasticsearch中是一个非常重要的概念，决定了一个index中的field使用什么数据格式存储，使用什么分词器解析，是否有子字段等。
+
+为什么需要Mapping？
+
+如果没有mapping所有text类型属性默认都使用standard分词器。所以如果希望使用IK分词器就必须配置自定义mapping。
+
+### 8.1.mapping核心数据类型
+
+es中的数据类型有很多，在这里只介绍常用的几种数据类型。
+
+`只有text类型才能被分词。其他类型不允许。`
+
+文本（字符串）：text
+
+整数：byte、short、integer、long
+
+浮点型：float、double
+
+布尔类型：boolean
+
+日期类型：`date yyyy-MM-dd HH:mm:ss:SSS`
+
+数组类型：array []
+
+对象类型：object {}
+
+不分词的字符串（关键字）：keyword
+
+### 8.2.dynamic mapping对字段的类型分配
+
+true or false -> boolean
+
+123 -> long
+
+123.123 -> float
+
+hello word -> text
+
+2021-01-01 -> date
+
+[] -> array
+
+{} -> object
+
+在上述的自动mapping字段类型分配的时候，只有text类型的字段需要分词器。默认分词器是standard分词器。
+
+### 8.3.查看索引mapping
+
+`GET my_index/_mapping`
+
+### 8.4.custom mapping
+
+可以通过命令，在创建index和type的时候来定制mapping映射，也就是指定字段的类型和字段数据使用的分词器。
+
+`手工定制mapping时，只能新增mapping设置，不能对已有的mapping进行修改。`
+
+通常都是手工创建index，并进行各种定义。如：settings，mapping等。
+
+`PUT test_mapping`
+`{`
+  `"settings": {`
+    `"number_of_shards": 2,`
+    `"number_of_replicas": 0`
+  `},`
+  `"mappings": {`
+    `"test_type":{`
+      `"properties":{`
+        `"name":{`
+          `"type":"text",`
+          `"analyzer":"ik_max_word"`
+        `}`
+      `}`
+    `}`
+  `}`
+`}`
+
+## 9.es中的搜索详情
+
+### 9.1.query string search
+
+search的参数都是类似http请求头中的字符串参数提供搜索条件的。
+
+`GET /index_name/type_name/_search?parameter_name=parameter_value&...`
+
+#### 9.1.1全搜索
+
+timeout参数：是超时史称定义。代表每个节点上的每个shard执行搜索时最多耗时多久。不会影响响应的正常返回。只会影响响应中的数据的数量。
+
+`GET 索引名/类型名/_search?timeout=10ms`
+
+#### 9.1.2.multi index搜索
+
+multi index搜索：所谓的multi_index就是从多个index中搜索数据。相对使用较少，只有在复合数据搜索的时候可能出现。一般来说，如果真使用复合数据搜索，都会使用_all。
+
+`GET _search`
+
+`GET 索引名1,索引名2.../_search`	#多个index中的数据
+
+`GET 索引名/类型名/_search`	#同一个index中type数据
+
+`GET indexPrefix_*/_search`	#通配符搜索,搜索前缀xxx的索引
+
+`GET *_indexSuffix/_search`	#通配符搜索,搜索后缀xxx的索引
+
+`GET _all/_search`	#all代表所有索引
+
+`GET 索引名/_search?q=字段名:搜索条件	如：GET test_search/test_type/_search?q=age:26`
+
+#### 9.1.3.分页搜索
+
+默认情况下，es搜索返回结果是10条数据。从第0条开始查询。
+
+size和from是es中具有特定含义的属性名。
+
+GET 索引名/_search?size=10	#size查询数据的行数
+
+GET 索引名/_search?from=0&size=10	#从第几行开始查询，行号从0开始
+
+#### 9.1.4.+/-搜索
+
+`GET 索引名/_search?q=字段名:条件`
+
+`GET 索引名/_search?q=+字段名:条件`
+
+`GET 索引名/_search?q=-字段名:条件`
+
++：和不定义符号含义一样，就是搜索指定的字段中包含key words的数据
+
+-：与+符号含义相反，就是搜索指定的字段中不包含key words的数据
+
+#### 9.1.5.排序
+
+`GET 索引名/_search?sort=字段名:排序规则`
+
+`GET test_search/_search?sort=age:asc`
+
+`GET test_search/_search?sort=age:desc`
+
+### 9.2. query DSL
+
