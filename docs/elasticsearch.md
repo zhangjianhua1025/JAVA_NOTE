@@ -102,6 +102,8 @@ soft nproc ：单个用户可用的最大进程数量(超过会警告);
 
 由于es是java编写，默认启动会占用2G堆内存，内存不足则无法启动。可以启动时添加设置内存大小：`-e ES_JAVA_OPTS="-Xms256m -Xmx256m"`
 
+如：`docker run -e ES_JAVA_OPTS="-Xms256m -Xms256m" -d -p 9200:9200 -p 9300:9300 --name ES elasticsearch:6.8.4`
+
 启动后访问如图所示则安装成功：curl http://192.168.91.20:9200
 
 ![es-success](./images/es-success.PNG)
@@ -110,7 +112,7 @@ soft nproc ：单个用户可用的最大进程数量(超过会警告);
 
 `docker pull kibana:6.8.4`
 
-`docker run -it -d -e ELASTICSEARCH_URL=http://192.168.91.20:9200 --name kibana --link elasticsearch:elasticsearch -p 5601:5601 kibana:6.8.4`
+`docker run -it -d -e ELASTICSEARCH_URL=http://192.168.91.20:9200 --name kibana --link elasticsearch:elasticsearch(此处elasticsearch为安装的es容器名，前面的elasticsearch固定) -p 5601:5601 kibana:6.8.4`
 
 注：
 
@@ -545,4 +547,187 @@ GET 索引名/_search?from=0&size=10	#从第几行开始查询，行号从0开�
 `GET test_search/_search?sort=age:desc`
 
 ### 9.2. query DSL
+
+DSL - Domain Specified Language， 领域特殊语言
+
+请求参数是请求体传递的。在es中，请求体的字符集默认为UTF-8。
+
+`GET 索引名/_search`
+
+`{`
+
+​	`"command":{"parameter_name":"parameter_value"}`
+
+`}`
+
+#### 9.2.1查询所有数据
+
+`GET 索引名/_search`
+
+`{`
+
+​	`"query":{"match_all":{}}`
+
+`}`
+
+#### 9.2.2.match search(项目搜索功能使用此命令)
+
+`GET my_index/_search`
+`{`
+  `"query": {`
+    `"match": {`
+      `"name" : "uuuuuuu"`
+    `}`
+  `}`
+`}`
+
+#### 9.2.3.phrase search
+
+短语搜索。要求查询条件必须和具体数据完全匹配才算搜索结果。其特征是：
+
+1.对搜索条件进行拆词
+
+2.把拆词当作一个整体，整体去索引（索引是存储内容被拆词后的结果）中匹配，必须严格匹配（存储内容拆词后是：北京，大兴，朝阳，条件拆词是：北京，朝阳。这种情况是不能被查询的，以为北京和朝阳之前还有大兴）才能查到。
+
+`GET my_index/_search`
+`{`
+  `"query": {`
+    `"match_phrase": {`
+      `"name" : "uuuuuuu"`
+    `}`
+  `}`
+`}`
+
+#### 9.2.4.range
+
+范围比较搜索
+
+`GET 索引名/类型名/_search`
+
+`{`
+  `"query": {`
+    `"range": {`
+      `"age": {`
+        `"gte": 10,`
+        `"lte": 25`
+      `}`
+    `}`
+  `}`
+`}`
+
+如：
+
+`GET my_index/_search`
+`{`
+  `"query": {`
+    `"range": {`
+      `"age": {`
+        `"gte": 10,`
+        `"lte": 25`
+      `}`
+    `}`
+  `}`
+`}`
+
+#### 9.2.5.多条件复合
+
+使用bool有三种功能：must、must_not、should
+
+`GET my_index/_search`
+`{`
+  `"query": {`
+    `"bool": {`
+      `"must": [`
+        `{`
+          `"match": {`
+            `"name": "uuuuuuu"`
+          `}`
+        `},`
+        `{`
+          `"range": {`
+            `"age": {`
+              `"gte": 10,`
+              `"lte": 25`
+            `}`
+          `}`
+        `}`
+      `]`
+    `}`
+  `}`
+`}`
+
+#### 9.2.6.排序
+
+`GET my_index/_search`
+`{`
+  `"query": {`
+    `"match_all": {}`
+  `},`
+  `"sort": [`
+    `{`
+      `"age": {`
+        `"order": "desc"`
+      `}`
+    `}`
+  `]`
+`}`
+
+#### 9.2.7.分页
+
+`GET my_index/_search`
+`{`
+  `"query": {`
+    `"match_all": {}`
+  `},`
+  `"sort": [`
+    `{`
+      `"age": {`
+        `"order": "desc"`
+      `}`
+    `}`
+  `],`
+  `"from": 0,`
+  `"size": 20`
+`}`
+
+#### 9.2.8.highlight display
+
+在搜索中经常需要对搜索关键字做高亮显示，这个时候就可以使用highlight
+
+`GET my_index/_search`
+`{`
+  `"query": {`
+    `"match": {`
+      `"name": "zhangjianhua"`
+    `}`
+  `},`
+  `"highlight": {`
+    `"fields": {`
+      `"name":{`
+        `"number_of_fragments": 5,`
+        `"fragment_size": 20`
+      `}`
+    `}`
+  `}`
+`}`
+
+## 10.java操作es
+
+在java中操作es有两种方式。
+
+**1.es提供的客户端API**
+
+依赖的名称叫做transport。**依赖版本和es的版本是对应的**。
+
+```
+<dependency>
+    <groupId>org.elasticsearch.client</groupId>
+    <artifactId>transport</artifactId>
+    <version>6.8.4</version>
+</dependency>
+```
+
+**2.Spring Data Elasticsearch**
+
+使用Spring Data下二级子项目Spring Data Elasticsearch进行操作。支持POJO方法操作es。相比es提供的API更加简单方便。
 
